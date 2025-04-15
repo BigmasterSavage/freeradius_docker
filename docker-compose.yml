@@ -1,0 +1,42 @@
+services:
+
+  db:
+    build:
+      context: .
+      dockerfile: Dockerfile.mariadb
+    container_name: mariadb
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 12345
+      MYSQL_DATABASE: radius
+      MYSQL_USER: radius
+      MYSQL_PASSWORD: 12345
+    ports:
+      - "3306:3306"
+    volumes:
+      - /var/lib/db:/var/lib/mysql  # БД сохраняется на хосте
+
+  freeradius:
+    build:
+      context: .
+      dockerfile: Dockerfile.freeradius
+    container_name: freeradius
+    depends_on:
+      - db
+    ports:
+      - "1812:1812/udp"
+      - "1813:1813/udp"
+    restart: unless-stopped
+
+  apache:
+    build:
+      context: .
+      dockerfile: Dockerfile.apache
+    container_name: daloradius
+    depends_on:
+      - db
+    ports:
+      - "80:80"
+      - "8000:8000"
+    restart: unless-stopped
+

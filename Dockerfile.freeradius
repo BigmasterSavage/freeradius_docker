@@ -1,0 +1,51 @@
+### Dockerfile для FreeRADIUS
+
+# Используем образ Debian
+FROM debian:11
+
+# Устанавливаем зависимости
+RUN apt-get update && apt-get install -y \
+    freeradius \
+    freeradius-mysql \
+    freeradius-utils \
+    freeradius-ldap \
+    vim \
+    nano \
+    && rm -rf /var/lib/apt/lists/*
+
+
+
+# Копируем конфигурацию для работы с БД
+COPY ./sql /etc/freeradius/3.0/mods-available/sql
+
+# Настраиваем SQL модуль
+RUN ln -s /etc/freeradius/3.0/mods-available/sql /etc/freeradius/3.0/mods-enabled/ && \
+    chown freerad:freerad -R /etc/freeradius/3.0/mods-enabled/sql
+
+
+# Вносим изменения в конфигурацию FreeRADIUS с помощью sed
+RUN sed -i 's/dialect = \"sqlite\"/dialect = \"mysql\"/' /etc/freeradius/3.0/mods-available/sql && \
+    sed -i 's/driver = \"rlm_sql_null\"/driver = \"rlm_sql_mysql\"/' /etc/freeradius/3.0/mods-available/sql && \
+    sed -i 's/\(\s*ca_file = .*$\)/#\1/' /etc/freeradius/3.0/mods-available/sql && \
+    sed -i 's/\(\s*ca_path = .*$\)/#\1/' /etc/freeradius/3.0/mods-available/sql && \
+    sed -i 's/\(\s*certificate_file = .*$\)/#\1/' /etc/freeradius/3.0/mods-available/sql && \
+    sed -i 's/\(\s*private_key_file = .*$\)/#\1/' /etc/freeradius/3.0/mods-available/sql && \
+    sed -i 's/\(\s*cipher = .*$\)/#\1/' /etc/freeradius/3.0/mods-available/sql && \
+    sed -i 's/\(\s*tls_required = .*$\)/#\1/' /etc/freeradius/3.0/mods-available/sql && \
+    sed -i 's/\(\s*tls_check_cert = .*$\)/#\1/' /etc/freeradius/3.0/mods-available/sql && \
+    sed -i 's/\(\s*tls_check_cert_cn = .*$\)/#\1/' /etc/freeradius/3.0/mods-available/sql && \
+    sed -i 's/# server = \"localhost\"/server = \"172.17.0.2\"/' /etc/freeradius/3.0/mods-available/sql && \
+    sed -i 's/# port = 3306/port = 3306/' /etc/freeradius/3.0/mods-available/sql && \
+    sed -i 's/# login = \"radius\"/login = \"root\"/' /etc/freeradius/3.0/mods-available/sql && \
+    sed -i 's/# password = \"radpass\"/password = \"12345/' /etc/freeradius/3.0/mods-available/sql && \
+    sed -i 's/# radius_db = \"radius\"/radius_db = \"radius\"/' /etc/freeradius/3.0/mods-available/sql && \
+    sed -i 's/# read_clients = yes/read_clients = yes/' /etc/freeradius/3.0/mods-available/sql
+
+# Открываем порты для RADIUS
+EXPOSE 1812/udp 1813/udp
+
+# Указываем рабочую директорию
+WORKDIR /etc/freeradius/3.0/
+
+# Команда запуска 
+CMD ["freeradius", "-X"]

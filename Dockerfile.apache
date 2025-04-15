@@ -1,0 +1,52 @@
+# Базовый образ
+FROM php:7.4-apache
+
+# Обновление системы и установка необходимых пакетов
+RUN apt-get update && apt-get install -y \
+    git \
+    unzip \
+    curl \
+    libcurl \
+    mariadb-client \
+    libmariadb-dev \
+    libpng-dev \
+    && docker-php-ext-install mysqli pdo_mysql dba gd curl mbstring xml \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+
+# Скачивание daloRADIUS
+WORKDIR /var/www/html
+RUN git clone https://github.com/lirantal/daloradius.git daloradius \
+    && chown -R www-data:www-data daloradius \
+    && chmod -R 755 daloradius
+
+# Настройка daloRADIUS
+WORKDIR /var/www/html/daloradius
+RUN cp app/common/includes/daloradius.conf.php.sample app/common/includes/daloradius.conf.php \
+    && chown www-data:www-data app/common/includes/daloradius.conf.php
+
+
+RUN sed -i "s/\$configValues\['CONFIG_DB_ENGINE'\] = '.*';/\$configValues\['CONFIG_DB_ENGINE'\] = 'mysqli';/" app/common/includes/daloradius.conf.php && \
+    sed -i "s/\$configValues\['CONFIG_DB_HOST'\] = '.*';/\$configValues\['CONFIG_DB_HOST'\] = 'localhost';/" app/common/includes/daloradius.conf.php && \
+    sed -i "s/\$configValues\['CONFIG_DB_PORT'\] = '.*';/\$configValues\['CONFIG_DB_PORT'\] = '3306';/" app/common/includes/daloradius.conf.php && \
+    sed -i "s/\$configValues\['CONFIG_DB_USER'\] = '.*';/\$configValues\['CONFIG_DB_USER'\] = 'radius';/" app/common/includes/daloradius.conf.php && \
+    sed -i "s/\$configValues\['CONFIG_DB_PASS'\] = '.*';/\$configValues\['CONFIG_DB_PASS'\] = 'radius';/" app/common/includes/daloradius.conf.php && \
+    sed -i "s/\$configValues\['CONFIG_DB_NAME'\] = '.*';/\$configValues\['CONFIG_DB_NAME'\] = 'radius';/" app/common/includes/daloradius.conf.php
+
+RUN echo "Listen 8000" >> /etc/apache2/ports.conf && \
+    echo "Alias /operators /var/www/html/daloradius/app/operators\n<VirtualHost *:8000>\n    DocumentRoot /var/www/html/daloradius/app/operators\n    ErrorLog \${APACHE_LOG_DIR}/daloradius_operators.error.log\n    CustomLog \${APACHE_LOG_DIR}/daloradius_operators.access.log combined\n    <Directory /var/www/html/daloradius/app/operators>\n        Options -Indexes +FollowSymLinks\n        AllowOverride None\n        Require all granted\n    </Directory>\n    <Directory /var/www/daloradius>\n        Require all denied\n    </Directory>\n</VirtualHost>" > /etc/apache2/sites-available/daloradius_operators.conf && \
+    echo "<VirtualHost *:80>\n    DocumentRoot /var/www/html/daloradius/app/users\n    ErrorLog \${APACHE_LOG_DIR}/daloradius_users.error.log\n    CustomLog \${APACHE_LOG_DIR}/daloradius_users.access.log combined\n    <Directory /var/www/html/daloradius/app/users>\n        Options -Indexes +FollowSymLinks\n        AllowOverride None\n        Require all granted\n    </Directory>\n    <Directory /var/www/daloradius>\n        Require all denied\n    </Directory>\n</VirtualHost>" > /etc/apache2/sites-available/daloradius_users.conf && \
+    a2ensite daloradius_operators.conf && \
+    a2ensite daloradius_users.conf && \
+    a2dissite 000-default && \
+    service apache2 restart
+
+# Настройка прав доступа
+RUN chown -R www-data:www-data /var/www/html/daloradius
+
+# Открытие порта Apache
+EXPOSE 80 8080
+
+# Запуск Apache
+CMD ["apache2-foreground"]
