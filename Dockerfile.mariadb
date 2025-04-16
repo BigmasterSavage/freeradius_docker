@@ -16,9 +16,8 @@ RUN apt-get update && apt-get install -y wget git
 
 # Выкачиваем схемы баз данных для FreeRADIUS и daloRADIUS
 
-RUN git clone https://github.com/lirantal/daloradius.git /tmp/daloradius && \
-    cp /tmp/daloradius/contrib/db/fr3-mariadb-freeradius.sql /docker-entrypoint-initdb.d/fr3-mariadb-freeradius.sql && \
-    cp /tmp/daloradius/contrib/db/mariadb-daloradius.sql /docker-entrypoint-initdb.d/mariadb-daloradius.sql && \
+RUN git clone https://github.com/FreeRADIUS/freeradius-server.git /tmp/daloradius && \
+    cp /tmp/daloradius/raddb/mods-config/sql/main/mysql/schema.sql /docker-entrypoint-initdb.d/schema.sql && \
     rm -rf /tmp/daloradius
 
 # Настраиваем базу данных при старте контейнера
