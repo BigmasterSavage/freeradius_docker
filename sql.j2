@@ -51,7 +51,7 @@ sql {
 	#    * postgresql
 	#    * sqlite
 	#
-	dialect = "sqlite"
+	dialect = "mysql"
 
 	#
 	#  driver:: The sub-module to use to execute queries. It
@@ -77,7 +77,7 @@ sql {
 	#  | unixodbc          | mssql
 	#  |===
 	#
-	driver = "${dialect}"
+	driver = "rlm_sql_${dialect}"
 
 	#
 	#  Include driver specific configuration file if one
