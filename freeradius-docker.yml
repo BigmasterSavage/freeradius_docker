@@ -1,0 +1,118 @@
+---
+
+- name: Deploy FreeRADIUS with Docker on remote server
+  hosts: localhost
+  become: yes
+  vars_prompt:
+    - name: mysql_root_password
+      prompt: "MySQL root password"
+      private: yes
+    - name: mysql_database
+      prompt: "Имя DB"
+      private: no
+    - name: mysql_user
+      prompt: "Имя пользователя MySQL для FreeRADIUS"
+      private: no
+    - name: mysql_password
+      prompt: "Пароль пользователя MySQL для FreeRADIUS"
+      private: yes
+    - name: mysql_port
+      prompt: "Порт"
+      private: no
+    - name: mysql_ip
+      prompt: "IP-адрес сервера/контейнера MySQL (172.18.0.2)"
+      private: no
+      
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install dependencies
+      apt:
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+        state: present
+
+    - name: Add Docker GPG key
+      shell: |
+        curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+      args:
+        creates: /usr/share/keyrings/docker-archive-keyring.gpg
+
+    - name: Add Docker repository
+      shell: |
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
+      args:
+        creates: /etc/apt/sources.list.d/docker.list
+
+    - name: Update apt cache after adding Docker repo
+      apt:
+        update_cache: yes
+
+    - name: Install Docker
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+        state: present
+
+    - name: Start and enable Docker service
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Clone FreeRADIUS Docker repository
+      git:
+        repo: https://github.com/BigmasterSavage/freeradius_docker.git
+        dest: /opt/freeradius_docker
+        version: main
+
+    - name: Create .env file for Docker Compose
+      copy:
+        dest: /opt/freeradius_docker/.env
+        content: |
+          MYSQL_ROOT_PASSWORD={{ mysql_root_password }}
+          MYSQL_DATABASE={{ mysql_database }}
+          MYSQL_USER={{ mysql_user }}
+          MYSQL_PASSWORD={{ mysql_password }}
+          MYSQL_PORT={{ mysql_port }}
+          MYSQL_IP=localhost
+
+    - name: Generate FreeRADIUS SQL configuration from template
+      template:
+        src: /opt/freeradius_docker/sql.j2
+        dest: /opt/freeradius_docker/sql
+
+    - name: Build Docker image
+      command: >
+        docker compose build
+      args:
+        chdir: /opt/freeradius_docker
+
+    - name: Start FreeRADIUS container
+      command: >
+        docker compose up -d
+      args:
+        chdir: /opt/freeradius_docker
+
+    - name: Check if the container is running
+      command: >
+        docker ps
+      register: docker_ps_output
+      changed_when: false
+
+    - name: Remove temporary .env file
+      file:
+        path: /opt/freeradius_docker/.env
+        state: absent
+        
+    - name: Remove temporary sql file
+      file:
+        path: /opt/freeradius_docker/sql
+        state: absent
