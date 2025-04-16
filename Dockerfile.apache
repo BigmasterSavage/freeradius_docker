@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Копируем конфиг для DaloRADIUS
-CP daloradius.conf.php.sample.j2 /var/www/html/daloradius/app/common/includes/daloradius.conf.php.sample
+COPY daloradius.conf.php.sample.j2 /var/www/html/daloradius/app/common/includes/daloradius.conf.php.sample
 
 # Скачивание daloRADIUS
 WORKDIR /var/www/html
